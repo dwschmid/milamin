@@ -1,0 +1,520 @@
+--- orig/triangle.c	2005-07-29 00:11:00.000000000 +0200
++++ bin/triangle.c	2006-10-13 13:22:12.000000000 +0200
+@@ -1530,6 +1530,9 @@
+   printf("    -Q  Quiet:  No terminal output except errors.\n");
+   printf("    -V  Verbose:  Detailed information on what I'm doing.\n");
+   printf("    -h  Help:  Detailed instructions for Triangle.\n");
++
++  // Binary output patch
++  printf("    -b  Binary file output.\n");
+   triexit(0);
+ }
+ 
+@@ -14362,6 +14365,22 @@
+   int vertexnumber;
+   int i;
+ 
++  ////////////////
++  // Binary output patch
++  REAL dtmp;
++  int  binout=0;
++#ifndef TRILIBRARY
++  {
++    i=0;
++    while(i<argc){
++      if(!strcmp(argv[i++], "-b")){
++	binout = 1;
++      }
++    }
++  }
++#endif
++  ////////////////
++
+   if (b->jettison) {
+     outvertices = m->vertices.items - m->undeads;
+   } else {
+@@ -14394,15 +14413,33 @@
+   if (!b->quiet) {
+     printf("Writing %s.\n", nodefilename);
+   }
+-  outfile = fopen(nodefilename, "w");
++
++  // Binary output patch
++  if(binout){
++    outfile = fopen(nodefilename, "wb");
++  } else 
++    outfile = fopen(nodefilename, "w");
++
+   if (outfile == (FILE *) NULL) {
+     printf("  Error:  Cannot create file %s.\n", nodefilename);
+     triexit(1);
+   }
+   /* Number of vertices, number of dimensions, number of vertex attributes, */
+   /*   and number of boundary markers (zero or one).                        */
+-  fprintf(outfile, "%ld  %d  %d  %d\n", outvertices, m->mesh_dim,
+-          m->nextras, 1 - b->nobound);
++
++  // Binary output patch
++  if(binout){
++    dtmp=outvertices;
++    fwrite(&dtmp,1,sizeof(REAL),outfile);
++    dtmp=m->mesh_dim;
++    fwrite(&dtmp,1,sizeof(REAL),outfile);
++    dtmp=m->nextras;
++    fwrite(&dtmp,1,sizeof(REAL),outfile);
++    dtmp=1 - b->nobound;
++    fwrite(&dtmp,1,sizeof(REAL),outfile);
++  } else 
++    fprintf(outfile, "%ld  %d  %d  %d\n", outvertices, m->mesh_dim,
++	    m->nextras, 1 - b->nobound);
+ #endif /* not TRILIBRARY */
+ 
+   traversalinit(&m->vertices);
+@@ -14424,17 +14461,41 @@
+       }
+ #else /* not TRILIBRARY */
+       /* Vertex number, x and y coordinates. */
+-      fprintf(outfile, "%4d    %.17g  %.17g", vertexnumber, vertexloop[0],
+-              vertexloop[1]);
+-      for (i = 0; i < m->nextras; i++) {
+-        /* Write an attribute. */
+-        fprintf(outfile, "  %.17g", vertexloop[i + 2]);
+-      }
++      
++      // Binary output patch
++      if(binout){
++	dtmp=vertexnumber;
++	fwrite(&dtmp,1,sizeof(REAL),outfile);
++	dtmp=(REAL)vertexloop[0];
++	fwrite(&dtmp,1,sizeof(REAL),outfile);
++	dtmp=(REAL)vertexloop[1];
++	fwrite(&dtmp,1,sizeof(REAL),outfile);
++      } else
++	fprintf(outfile, "%4d    %.17g  %.17g", vertexnumber, vertexloop[0],
++		vertexloop[1]);
++
++      // Binary output patch
++      if(binout){
++	fwrite(vertexloop+2, m->nextras, sizeof(REAL), outfile);
++      } else
++	for (i = 0; i < m->nextras; i++) {
++	  /* Write an attribute. */
++	  fprintf(outfile, "  %.17g", vertexloop[i + 2]);
++	}
++      
+       if (b->nobound) {
+-        fprintf(outfile, "\n");
++	// Binary output patch
++	if(!binout)
++	  fprintf(outfile, "\n");
+       } else {
+         /* Write the boundary marker. */
+-        fprintf(outfile, "    %d\n", vertexmark(vertexloop));
++
++	// Binary output patch
++	if(binout){
++	  dtmp=(REAL)vertexmark(vertexloop);
++	  fwrite(&dtmp,1,sizeof(REAL),outfile);
++	} else 
++	  fprintf(outfile, "    %d\n", vertexmark(vertexloop));
+       }
+ #endif /* not TRILIBRARY */
+ 
+@@ -14445,7 +14506,11 @@
+   }
+ 
+ #ifndef TRILIBRARY
+-  finishfile(outfile, argc, argv);
++  // Binary output patch
++  if(binout){
++    fclose(outfile);
++  } else 
++    finishfile(outfile, argc, argv);
+ #endif /* not TRILIBRARY */
+ }
+ 
+@@ -14533,6 +14598,22 @@
+   long elementnumber;
+   int i;
+ 
++  ////////////////
++  // Binary output patch
++  REAL dtmp;
++  int  binout=0;
++#ifndef TRILIBRARY
++  {
++    i=0;
++    while(i<argc){
++      if(!strcmp(argv[i++], "-b")){
++	binout = 1;
++      }
++    }
++  }
++#endif
++  ////////////////
++
+ #ifdef TRILIBRARY
+   if (!b->quiet) {
+     printf("Writing triangles.\n");
+@@ -14557,14 +14638,29 @@
+   if (!b->quiet) {
+     printf("Writing %s.\n", elefilename);
+   }
+-  outfile = fopen(elefilename, "w");
++
++  // Binary output patch
++  if(binout){
++    outfile = fopen(elefilename, "wb");
++  } else 
++    outfile = fopen(elefilename, "w");
++
+   if (outfile == (FILE *) NULL) {
+     printf("  Error:  Cannot create file %s.\n", elefilename);
+     triexit(1);
+   }
+   /* Number of triangles, vertices per triangle, attributes per triangle. */
+-  fprintf(outfile, "%ld  %d  %d\n", m->triangles.items,
+-          (b->order + 1) * (b->order + 2) / 2, m->eextras);
++  // Binary output patch
++  if(binout){
++    dtmp=m->triangles.items;
++    fwrite(&dtmp,1,sizeof(REAL),outfile);
++    dtmp=(b->order + 1) * (b->order + 2) / 2;
++    fwrite(&dtmp,1,sizeof(REAL),outfile);
++    dtmp=m->eextras;
++    fwrite(&dtmp,1,sizeof(REAL),outfile);
++  } else 
++    fprintf(outfile, "%ld  %d  %d\n", m->triangles.items,
++	    (b->order + 1) * (b->order + 2) / 2, m->eextras);
+ #endif /* not TRILIBRARY */
+ 
+   traversalinit(&m->triangles);
+@@ -14582,8 +14678,19 @@
+       tlist[vertexindex++] = vertexmark(p3);
+ #else /* not TRILIBRARY */
+       /* Triangle number, indices for three vertices. */
+-      fprintf(outfile, "%4ld    %4d  %4d  %4d", elementnumber,
+-              vertexmark(p1), vertexmark(p2), vertexmark(p3));
++      // Binary output patch
++      if(binout){
++	dtmp=elementnumber;
++	fwrite(&dtmp,1,sizeof(REAL),outfile);
++	dtmp=vertexmark(p1);
++	fwrite(&dtmp,1,sizeof(REAL),outfile);
++	dtmp=vertexmark(p2);
++	fwrite(&dtmp,1,sizeof(REAL),outfile);
++	dtmp=vertexmark(p3);
++	fwrite(&dtmp,1,sizeof(REAL),outfile);
++      } else
++	fprintf(outfile, "%4ld    %4d  %4d  %4d", elementnumber,
++		vertexmark(p1), vertexmark(p2), vertexmark(p3));
+ #endif /* not TRILIBRARY */
+     } else {
+       mid1 = (vertex) triangleloop.tri[m->highorderindex + 1];
+@@ -14598,9 +14705,26 @@
+       tlist[vertexindex++] = vertexmark(mid3);
+ #else /* not TRILIBRARY */
+       /* Triangle number, indices for six vertices. */
+-      fprintf(outfile, "%4ld    %4d  %4d  %4d  %4d  %4d  %4d", elementnumber,
+-              vertexmark(p1), vertexmark(p2), vertexmark(p3), vertexmark(mid1),
+-              vertexmark(mid2), vertexmark(mid3));
++      // Binary output patch
++      if(binout){
++	dtmp=elementnumber;
++	fwrite(&dtmp,1,sizeof(REAL),outfile);
++	dtmp=vertexmark(p1);
++	fwrite(&dtmp,1,sizeof(REAL),outfile);
++	dtmp=vertexmark(p2);
++	fwrite(&dtmp,1,sizeof(REAL),outfile);
++	dtmp=vertexmark(p3);
++	fwrite(&dtmp,1,sizeof(REAL),outfile);
++	dtmp=vertexmark(mid1);
++	fwrite(&dtmp,1,sizeof(REAL),outfile);
++	dtmp=vertexmark(mid2);
++	fwrite(&dtmp,1,sizeof(REAL),outfile);
++	dtmp=vertexmark(mid3);
++	fwrite(&dtmp,1,sizeof(REAL),outfile);
++      } else
++	fprintf(outfile, "%4ld    %4d  %4d  %4d  %4d  %4d  %4d", elementnumber,
++		vertexmark(p1), vertexmark(p2), vertexmark(p3), vertexmark(mid1),
++		vertexmark(mid2), vertexmark(mid3));
+ #endif /* not TRILIBRARY */
+     }
+ 
+@@ -14610,17 +14734,28 @@
+     }
+ #else /* not TRILIBRARY */
+     for (i = 0; i < m->eextras; i++) {
+-      fprintf(outfile, "  %.17g", elemattribute(triangleloop, i));
+-    }
+-    fprintf(outfile, "\n");
++      // Binary output patch
++      if(binout){
++	dtmp=elemattribute(triangleloop, i);
++	fwrite(&dtmp,1,sizeof(REAL),outfile);
++      } else 
++	fprintf(outfile, "  %.17g", elemattribute(triangleloop, i));
++    }
++    // Binary output patch
++    if(!binout)
++      fprintf(outfile, "\n");
+ #endif /* not TRILIBRARY */
+-
++    
+     triangleloop.tri = triangletraverse(m);
+     elementnumber++;
+-  }
+-
++    }
++    
+ #ifndef TRILIBRARY
+-  finishfile(outfile, argc, argv);
++  // Binary output patch
++  if(binout){
++    fclose(outfile);
++  } else 
++    finishfile(outfile, argc, argv);
+ #endif /* not TRILIBRARY */
+ }
+ 
+@@ -14820,6 +14955,23 @@
+   triangle ptr;                         /* Temporary variable used by sym(). */
+   subseg sptr;                      /* Temporary variable used by tspivot(). */
+ 
++  ////////////////
++  // Binary output patch
++  REAL dtmp;
++  int  binout=0;
++#ifndef TRILIBRARY
++  {
++    int i=0;
++    while(i<argc){
++      if(!strcmp(argv[i++], "-b")){
++	binout = 1;
++      }
++    }
++  }
++#endif
++  ////////////////
++
++
+ #ifdef TRILIBRARY
+   if (!b->quiet) {
+     printf("Writing edges.\n");
+@@ -14839,13 +14991,34 @@
+   if (!b->quiet) {
+     printf("Writing %s.\n", edgefilename);
+   }
+-  outfile = fopen(edgefilename, "w");
++
++  // Binary output patch
++  if(binout){
++    outfile = fopen(edgefilename, "wb");
++  } else 
++    outfile = fopen(edgefilename, "w");
++  
++
++
+   if (outfile == (FILE *) NULL) {
+     printf("  Error:  Cannot create file %s.\n", edgefilename);
+     triexit(1);
+   }
+   /* Number of edges, number of boundary markers (zero or one). */
++
++  // Binary output patch
++  if(binout){
++    dtmp=m->edges;
++    fwrite(&dtmp,1,sizeof(REAL),outfile);
++    dtmp=1-b->nobound;
++    fwrite(&dtmp,1,sizeof(REAL),outfile);
++  } else 
+   fprintf(outfile, "%ld  %d\n", m->edges, 1 - b->nobound);
++
++
++
++
++
+ #endif /* not TRILIBRARY */
+ 
+   traversalinit(&m->triangles);
+@@ -14871,8 +15044,17 @@
+         if (b->nobound) {
+ #ifndef TRILIBRARY
+           /* Edge number, indices of two endpoints. */
+-          fprintf(outfile, "%4ld   %d  %d\n", edgenumber,
+-                  vertexmark(p1), vertexmark(p2));
++	  // Binary output patch
++	  if(binout){
++            dtmp=edgenumber;
++            fwrite(&dtmp,1,sizeof(REAL),outfile);
++            dtmp=vertexmark(p1);
++            fwrite(&dtmp,1,sizeof(REAL),outfile);
++            dtmp=vertexmark(p2);
++	    fwrite(&dtmp,1,sizeof(REAL),outfile);
++          } else 
++            fprintf(outfile, "%4ld   %d  %d\n", edgenumber, vertexmark(p1), vertexmark(p2));
++
+ #endif /* not TRILIBRARY */
+         } else {
+           /* Edge number, indices of two endpoints, and a boundary marker. */
+@@ -14883,22 +15065,57 @@
+ #ifdef TRILIBRARY
+               emlist[edgenumber - b->firstnumber] = 0;
+ #else /* not TRILIBRARY */
+-              fprintf(outfile, "%4ld   %d  %d  %d\n", edgenumber,
+-                      vertexmark(p1), vertexmark(p2), 0);
++
++              // Binary output patch
++              if(binout){
++                dtmp=edgenumber;
++                fwrite(&dtmp,1,sizeof(REAL),outfile);
++                dtmp=vertexmark(p1);
++                fwrite(&dtmp,1,sizeof(REAL),outfile);
++                dtmp=vertexmark(p2);
++                fwrite(&dtmp,1,sizeof(REAL),outfile);
++                dtmp = 0;
++                fwrite(&dtmp,1,sizeof(REAL),outfile);
++              } else 
++                fprintf(outfile, "%4ld   %d  %d  %d\n", edgenumber, vertexmark(p1), vertexmark(p2), 0);
+ #endif /* not TRILIBRARY */
+             } else {
+ #ifdef TRILIBRARY
+               emlist[edgenumber - b->firstnumber] = mark(checkmark);
+ #else /* not TRILIBRARY */
+-              fprintf(outfile, "%4ld   %d  %d  %d\n", edgenumber,
+-                      vertexmark(p1), vertexmark(p2), mark(checkmark));
++
++              // Binary output patch
++              if(binout){
++                dtmp=edgenumber;
++                fwrite(&dtmp,1,sizeof(REAL),outfile);
++                dtmp=vertexmark(p1);
++                fwrite(&dtmp,1,sizeof(REAL),outfile);
++                dtmp=vertexmark(p2);
++                fwrite(&dtmp,1,sizeof(REAL),outfile);
++                dtmp=mark(checkmark);
++                fwrite(&dtmp,1,sizeof(REAL),outfile);
++              } else 
++                fprintf(outfile, "%4ld   %d  %d  %d\n", edgenumber, vertexmark(p1), vertexmark(p2), mark(checkmark));
++
+ #endif /* not TRILIBRARY */
+             }
+           } else {
+ #ifdef TRILIBRARY
+             emlist[edgenumber - b->firstnumber] = trisym.tri == m->dummytri;
+ #else /* not TRILIBRARY */
+-            fprintf(outfile, "%4ld   %d  %d  %d\n", edgenumber,
++
++            // Binary output patch
++            if(binout){
++              dtmp=edgenumber;
++              fwrite(&dtmp,1,sizeof(REAL),outfile);
++              dtmp=vertexmark(p1);
++              fwrite(&dtmp,1,sizeof(REAL),outfile);
++              dtmp=vertexmark(p2);
++              fwrite(&dtmp,1,sizeof(REAL),outfile);
++              dtmp=trisym.tri == m->dummytri;
++              fwrite(&dtmp,1,sizeof(REAL),outfile);
++            } else 
++              fprintf(outfile, "%4ld   %d  %d  %d\n", edgenumber,
+                     vertexmark(p1), vertexmark(p2), trisym.tri == m->dummytri);
+ #endif /* not TRILIBRARY */
+           }
+@@ -14910,7 +15127,12 @@
+   }
+ 
+ #ifndef TRILIBRARY
+-  finishfile(outfile, argc, argv);
++
++  // Binary output patch
++  if(binout){
++    fclose(outfile);
++  } else 
++    finishfile(outfile, argc, argv);
+ #endif /* not TRILIBRARY */
+ }
+ 
+@@ -15197,13 +15419,45 @@
+   if (!b->quiet) {
+     printf("Writing %s.\n", neighborfilename);
+   }
++  ////////////////
++  // Binary output patch
++  REAL dtmp;
++  int  binout=0;
++#ifndef TRILIBRARY
++  {
++    int i=0;
++    while(i<argc){
++      if(!strcmp(argv[i++], "-b")){
++	binout = 1;
++      }
++    }
++  }
++#endif
++  ////////////////
++
++  // Binary output patch
++  if(binout){
++    outfile = fopen(neighborfilename, "wb");
++  } else 
+   outfile = fopen(neighborfilename, "w");
++
+   if (outfile == (FILE *) NULL) {
+     printf("  Error:  Cannot create file %s.\n", neighborfilename);
+     triexit(1);
+   }
+   /* Number of triangles, three neighbors per triangle. */
++
++  // Binary output patch
++  if(binout){
++    dtmp=m->triangles.items;
++    fwrite(&dtmp,1,sizeof(REAL),outfile);    
++    dtmp=3;
++    fwrite(&dtmp,1,sizeof(REAL),outfile);    
++  } else
+   fprintf(outfile, "%ld  %d\n", m->triangles.items, 3);
++
++
++
+ #endif /* not TRILIBRARY */
+ 
+   traversalinit(&m->triangles);
+@@ -15236,8 +15490,24 @@
+     nlist[index++] = neighbor3;
+ #else /* not TRILIBRARY */
+     /* Triangle number, neighboring triangle numbers. */
++
++  // Binary output patch
++  if(binout){
++    dtmp=elementnumber;
++    fwrite(&dtmp,1,sizeof(REAL),outfile);
++    dtmp=neighbor1;
++    fwrite(&dtmp,1,sizeof(REAL),outfile);
++    dtmp=neighbor2;
++    fwrite(&dtmp,1,sizeof(REAL),outfile);
++    dtmp=neighbor3;
++    fwrite(&dtmp,1,sizeof(REAL),outfile);
++  } else 
+     fprintf(outfile, "%4ld    %d  %d  %d\n", elementnumber,
+             neighbor1, neighbor2, neighbor3);
++
++
++
++
+ #endif /* not TRILIBRARY */
+ 
+     triangleloop.tri = triangletraverse(m);
+@@ -15245,7 +15515,11 @@
+   }
+ 
+ #ifndef TRILIBRARY
+-  finishfile(outfile, argc, argv);
++  // Binary output patch
++  if(binout){
++    fclose(outfile);
++  } else 
++    finishfile(outfile, argc, argv);
+ #endif /* not TRILIBRARY */
+ }
+ 
